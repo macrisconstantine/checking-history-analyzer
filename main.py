@@ -53,6 +53,7 @@ avg_monthly_net = monthly["net"].mean()
 largest_deposit = df[df.money_in > 0]["money_in"].max()
 largest_withdrawal = df[df.money_out > 0]["money_out"].max()
 
+# Place more code here for finding more data
 # Trend (simple linear direction)
 trend = "increasing" if monthly["net"].iloc[-1] > monthly["net"].iloc[0] else "decreasing"
 
