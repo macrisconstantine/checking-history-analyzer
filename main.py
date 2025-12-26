@@ -49,6 +49,7 @@ avg_monthly_in = monthly["total_in"].mean()
 avg_monthly_out = monthly["total_out"].mean()
 avg_monthly_net = monthly["net"].mean()
 
+# Find greatest outlier instances for both inflow and outflow
 largest_deposit = df[df.money_in > 0]["money_in"].max()
 largest_withdrawal = df[df.money_out > 0]["money_out"].max()
 
