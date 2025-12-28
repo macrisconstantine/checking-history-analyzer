@@ -5,17 +5,19 @@ from pathlib import Path
 INPUT_FILE = "your_checking_account_statement.csv" 
 EXPORT_MONTHLY_CSV = True
 
-# Simple keyword mapping for categorization
+# Updated categories based on your actual CSV data
 CATEGORIES = {
-    "Housing": ["rent", "mortgage", "property tax"],
-    "Food": ["starbucks", "walmart", "grocery", "uber eats", "restaurant", "mcdonalds"],
-    "Utilities": ["electric", "water", "internet", "verizon", "at&t", "utility"],
-    "Transport": ["gas", "shell", "uber", "lyft", "parking", "auto"],
-    "Income": ["payroll", "deposit", "dividend", "interest"],
-    "Entertainment": ["netflix", "spotify", "steam", "hulu", "disney+"]
+    "Payroll/Income": ["payroll", "monthly interest", "wire deposit"],
+    "Investments/Crypto": ["binance", "fid bkg svc", "moneyline"],
+    "Education/Uni": ["georgia tech"],
+    "Credit Card PMT": ["cardmember serv", "citi card"],
+    "Zelle/Social": ["zelle"],
+    "Government/Fees": ["secretary of s"],
+    "Savings Transfer": ["360 performance"]
 }
 
 def categorize_description(desc):
+    if pd.isna(desc): return "Miscellaneous"
     desc = str(desc).lower()
     for cat, keywords in CATEGORIES.items():
         if any(kw in desc for kw in keywords):
@@ -26,56 +28,53 @@ def categorize_description(desc):
 df = pd.read_csv(INPUT_FILE)
 df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
 
-df["transaction_date"] = pd.to_datetime(df["transaction_date"])
+# 1. Map your specific column to 'description'
+df = df.rename(columns={'transaction_description': 'description'})
+
+# 2. Fix Date Warning (using the format in your CSV: MM/DD/YY)
+df["transaction_date"] = pd.to_datetime(df["transaction_date"], format='%m/%d/%y')
+
+# 3. Clean numeric data
 df["transaction_amount"] = pd.to_numeric(df["transaction_amount"]).abs().round(2)
 
-# Standardize Type
-df["is_credit"] = df["transaction_type"].str.lower() == "credit"
+# Categorization
 df["category"] = df["description"].apply(categorize_description)
 df["year_month"] = df["transaction_date"].dt.to_period("M")
 
-# Split In/Out
-df["money_in"] = df.apply(lambda r: r.transaction_amount if r.is_credit else 0, axis=1)
-df["money_out"] = df.apply(lambda r: r.transaction_amount if not r.is_credit else 0, axis=1)
+# Split Money In/Out
+df["money_in"] = df.apply(lambda r: r.transaction_amount if r.transaction_type.lower() == "credit" else 0, axis=1)
+df["money_out"] = df.apply(lambda r: r.transaction_amount if r.transaction_type.lower() == "debit" else 0, axis=1)
 
-# ---------- NEW FEATURES ----------
+# ---------- ANALYSIS ----------
 
-# 1. Savings Rate Calculation
-# Savings Rate = (Net / Total In) * 100
+# Monthly Aggregation
 monthly = df.groupby("year_month").agg(
-    total_in=("money_in", "sum"),
-    total_out=("money_out", "sum")
+    income=("money_in", "sum"),
+    expenses=("money_out", "sum"),
+    net_flow=("transaction_amount", lambda x: (df.loc[x.index, "money_in"] - df.loc[x.index, "money_out"]).sum())
 ).reset_index()
 
-monthly["net"] = monthly["total_in"] - monthly["total_out"]
-monthly["savings_rate_pct"] = (monthly["net"] / monthly["total_in"] * 100).round(2)
+# Category Breakdown
+cat_totals = df.groupby("category")["money_out"].sum().sort_values(ascending=False)
 
-# 2. Category Breakdown (Where is the money going?)
-spending_by_cat = df[df.money_out > 0].groupby("category")["money_out"].sum().sort_values(ascending=False)
+# Specific Zelle Insight (Who are you paying/receiving from most?)
+zelle_activity = df[df['description'].str.contains('Zelle', case=False, na=False)]
 
-# 3. Recurring Expense Detection (Potential Subscriptions)
-# Finds items with the exact same description and amount appearing multiple times
-recurring = df[df.money_out > 0].groupby(["description", "transaction_amount"]).size()
-subscriptions = recurring[recurring >= 3] # Appears 3+ times in the dataset
+# ---------- OUTPUT ----------
+print("\n===== ANALYSIS COMPLETE =====")
+print(f"Tracking period: {df.transaction_date.min().date()} to {df.transaction_date.max().date()}")
 
-# ---------- ADVANCED OUTPUT ----------
-print("\n" + "="*40)
-print("       ADVANCED FINANCIAL REPORT")
-print("="*40)
+print("\n--- Spending by Category ---")
+print(cat_totals.to_string())
 
-print(f"\n[SAVINGS RATE] Overall: {(monthly['net'].sum() / monthly['total_in'].sum() * 100):.2f}%")
-print("Top Spending Categories:")
-print(spending_by_cat.head(5).to_string())
+print("\n--- Zelle Traffic ---")
+if not zelle_activity.empty:
+    print(zelle_activity[['transaction_date', 'description', 'transaction_amount']].to_string(index=False))
 
-print("\n[RECURRING PAYMENTS] Possible Subscriptions:")
-if not subscriptions.empty:
-    print(subscriptions.to_string())
-else:
-    print("No clear recurring patterns detected.")
-
-print("\n[MONTHLY PERFORMANCE]")
-print(monthly[["year_month", "total_in", "total_out", "savings_rate_pct"]].to_string(index=False))
+print("\n--- Monthly Overview ---")
+print(monthly.to_string(index=False))
 
 if EXPORT_MONTHLY_CSV:
-    out_file = Path(INPUT_FILE).with_name("detailed_financials.csv")
+    out_file = Path(INPUT_FILE).with_name("financial_summary.csv")
     monthly.to_csv(out_file, index=False)
+    print(f"\nSaved to: {out_file}")
