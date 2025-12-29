@@ -2,7 +2,8 @@ import pandas as pd
 from pathlib import Path
 
 # ---------- CONFIG ----------
-INPUT_FILE = "2026-01-08_360Checking...0377.csv"   # change if needed
+# INPUT_FILE = "2026-01-08_360Checking...0377.csv"  
+INPUT_FILE = "your_checking_account_statement.csv"  
 EXPORT_MONTHLY_CSV = True
 # ----------------------------
 
