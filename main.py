@@ -44,6 +44,7 @@ total_in = df["money_in"].sum()
 total_out = df["money_out"].sum()
 net = total_in - total_out
 
+# Compute average monthly inflow and outflow
 avg_monthly_in = monthly["total_in"].mean()
 avg_monthly_out = monthly["total_out"].mean()
 avg_monthly_net = monthly["net"].mean()
