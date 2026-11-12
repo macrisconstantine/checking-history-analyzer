@@ -1,0 +1,10 @@
+# Statement exports and generated reports stay local.
+*.csv
+output/
+
+# Rules that name a real employer, school, charity or bank.
+rules_local.py
+
+__pycache__/
+*.pyc
+.venv/
